@@ -29,7 +29,13 @@ export function createChat() {
   const pendingReads = new Map<string, string>();
 
   const onlineUsers = $derived(
-    onlineUserIds.flatMap((id) => (userMap[id] ? [userMap[id]] : [])),
+    onlineUserIds
+      .flatMap((id) => (userMap[id] ? [userMap[id]] : []))
+      .sort((a, b) =>
+        a.username.localeCompare(b.username, undefined, {
+          sensitivity: "base",
+        }),
+      ),
   );
   const unreadChannels = $derived(
     channels.filter((channel) => channel.unread).map((channel) => channel.id),

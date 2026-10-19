@@ -11,7 +11,7 @@
   onMount(() => chat.connect());
 </script>
 
-<main>
+<main class="full-chat">
   <header class="mobile-toolbar">
     <strong class="mobile-title">orgchat</strong>
     <button
@@ -64,6 +64,7 @@
           users={chat.users}
           disabled={!chat.connected || chat.syncing || chat.loading}
           loading={chat.loading}
+          autoFocus
           hasOlder={chat.hasOlder}
           onLoadOlder={chat.loadOlder}
           onSend={chat.send}

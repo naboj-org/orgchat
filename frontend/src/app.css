@@ -1,26 +1,6 @@
-:root {
-  color-scheme: light dark;
-  --background: #fff;
-  --text: #222;
-  --border: #ddd;
-  --hover: #eee;
-  --muted: #666;
-  --error-text: #a12622;
-  --error-background: #fff0ef;
-  --error-border: #edb5b1;
-  --username-lightness: 32%;
-  font:
-    16px/1.5 system-ui,
-    sans-serif;
-  color: var(--text);
-  background: var(--background);
-}
+@import "./ui.css";
 
-body {
-  margin: 0;
-}
-
-main {
+.full-chat {
   display: grid;
   grid-template-columns: 280px minmax(280px, 1fr) 280px;
   height: 100dvh;
@@ -28,7 +8,6 @@ main {
 }
 
 nav,
-section,
 aside {
   padding: 24px;
 }
@@ -44,64 +23,6 @@ nav,
   border-right: 1px solid var(--border);
 }
 
-h1,
-h2 {
-  margin: 0 0 24px;
-  font-size: 18px;
-}
-
-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-li {
-  margin-bottom: 8px;
-}
-
-button {
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-button:hover:not(:disabled),
-button.active {
-  background: var(--hover);
-}
-
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 2px;
-}
-
-button:disabled {
-  color: var(--muted);
-  cursor: default;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1b1d21;
-    --text: #e5e7eb;
-    --border: #3a3e46;
-    --hover: #2b2f36;
-    --muted: #a0a7b2;
-    --error-text: #ffb4ac;
-    --error-background: #382322;
-    --error-border: #72413d;
-    --username-lightness: 72%;
-  }
-}
-
 .mobile-toolbar {
   display: none;
 }
@@ -111,7 +32,7 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  main {
+  .full-chat {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
   }
@@ -135,7 +56,7 @@ button:disabled {
     min-height: 44px;
   }
 
-  .mobile-toolbar button[aria-expanded='true'] {
+  .mobile-toolbar button[aria-expanded="true"] {
     background: var(--hover);
   }
 
@@ -158,7 +79,7 @@ button:disabled {
     overflow: visible;
   }
 
-  main > .conversation {
+  .full-chat > .conversation {
     grid-row: 3;
     border-right: 0;
   }
@@ -167,7 +88,8 @@ button:disabled {
     padding-block: 16px;
   }
 
-  h1, h2 {
+  h1,
+  h2 {
     margin-bottom: 16px;
   }
 }
@@ -181,30 +103,4 @@ button:disabled {
 
 .conversation > section {
   flex: 1;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 24px;
-  border-bottom: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.connection-status.error {
-  color: var(--error-text);
-  background: var(--error-background);
-  border-bottom-color: var(--error-border);
-}
-
-.connection-status span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.connection-status button {
-  width: auto;
 }

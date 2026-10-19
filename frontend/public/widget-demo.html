@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>orgchat embed demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        background: #fff;
+        color: #222;
+        font: 16px/1.6 system-ui, sans-serif;
+      }
+      body {
+        max-width: 680px;
+        margin: 64px auto;
+        padding: 0 24px 96px;
+      }
+      h1 { font-size: 28px; }
+      code {
+        display: block;
+        padding: 16px;
+        border: 1px solid #8886;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+      a { color: inherit; }
+      input, button {
+        padding: 8px 12px;
+        border: 1px solid #8886;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+      }
+      label { display: block; margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>A page with embedded orgchat</h1>
+      <p>
+        This is an ordinary HTML page. The chat button in the bottom-right corner
+        is loaded by a single script, with the chat itself isolated in an iframe.
+      </p>
+      <h2>Try it</h2>
+      <p>
+        Open the chat, switch channels, and send a message. Close it to return to
+        the launcher. Press Escape while inside the chat to close it as well.
+        Unread channels appear as a count on the launcher.
+      </p>
+      <p>
+        Start the mock server on port 3001 and the frontend with
+        <strong>pnpm dev</strong>. The mock server generates occasional messages
+        and presence changes. Open the <a href="/" target="_blank" rel="noopener">full chat</a>
+        in another tab to see messages synchronize.
+      </p>
+      <h2>Embed code</h2>
+      <code>&lt;script src="https://chat.example.org/widget.js" defer&gt;&lt;/script&gt;</code>
+      <p>
+        Replace the domain with the location of your chat deployment. No Svelte
+        code or chat styles are required on the host page.
+      </p>
+      <h2>The host page stays usable</h2>
+      <p>
+        The popup is non-modal. You can continue interacting with this page while
+        it is open, and the collapsed iframe only occupies the chat button.
+      </p>
+      <label for="example-input">An unrelated input on the host page</label>
+      <input id="example-input" placeholder="Type something here" />
+      <p><a href="/embed.html">View the widget entry point on its own</a></p>
+    </main>
+    <script src="./widget.js" defer></script>
+  </body>
+</html>

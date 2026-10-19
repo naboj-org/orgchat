@@ -13,6 +13,8 @@
     hasOlder = false,
     disabled = false,
     loading = false,
+    showHeading = true,
+    autoFocus = false,
   }: {
     channel: string;
     messages: Message[];
@@ -23,6 +25,8 @@
     hasOlder?: boolean;
     disabled?: boolean;
     loading?: boolean;
+    showHeading?: boolean;
+    autoFocus?: boolean;
   } = $props();
 
   let draft = $state("");
@@ -30,6 +34,8 @@
   let olderLoading = $state(false);
   let error = $state("");
   let list: HTMLDivElement;
+  let messageInput: HTMLInputElement;
+  let focusedInitially = false;
   let atBottom = true;
   let restoring = false;
   let pending: { text: string; id: string } | undefined;
@@ -62,6 +68,25 @@
       if (cancelled || !list) return;
       if (atBottom) list.scrollTop = list.scrollHeight;
       updateReadPosition();
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    if (
+      !autoFocus ||
+      disabled ||
+      focusedInitially ||
+      !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    )
+      return;
+    let cancelled = false;
+    tick().then(() => {
+      if (cancelled || !messageInput?.isConnected) return;
+      messageInput.focus({ preventScroll: true });
+      focusedInitially = true;
     });
     return () => {
       cancelled = true;
@@ -121,7 +146,7 @@
 </script>
 
 <section aria-label="Conversation history">
-  <h1>#{channel}</h1>
+  {#if showHeading}<h1>#{channel}</h1>{/if}
   <div class="messages" bind:this={list} onscroll={updateReadPosition}>
     {#if hasOlder}
       <button
@@ -150,6 +175,7 @@
   {#if error}<p class="notice" role="alert">{error}</p>{/if}
   <form onsubmit={send}>
     <input
+      bind:this={messageInput}
       aria-label={`Message #${channel}`}
       placeholder={`Message #${channel}`}
       bind:value={draft}
@@ -167,6 +193,9 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+    padding: var(--conversation-padding, 24px);
+    container-type: inline-size;
+    container-name: conversation;
   }
 
   h1,
@@ -177,13 +206,13 @@
   .messages {
     flex: 1;
     min-height: 0;
-    margin-inline: -24px;
+    margin-inline: calc(-1 * var(--conversation-padding, 24px));
     overflow-y: auto;
   }
 
   .notice {
     color: var(--muted);
-    padding-inline: 24px;
+    padding-inline: var(--conversation-padding, 24px);
     font-size: 14px;
   }
 
@@ -198,7 +227,7 @@
   form {
     display: flex;
     gap: 8px;
-    margin-top: 24px;
+    margin-top: var(--conversation-padding, 24px);
   }
 
   input {
@@ -227,7 +256,7 @@
     display: flex;
     align-items: baseline;
     gap: 12px;
-    padding: 4px 24px;
+    padding: 4px var(--conversation-padding, 24px);
   }
 
   .message:hover {
@@ -245,5 +274,16 @@
     white-space: nowrap;
     font-size: 14px;
     font-variant-numeric: tabular-nums;
+  }
+
+  @container conversation (max-width: 560px) {
+    .message {
+      display: block;
+    }
+
+    time {
+      margin-left: 8px;
+      font-size: 12px;
+    }
   }
 </style>
