@@ -106,6 +106,7 @@
     event.preventDefault();
     const text = draft.trim();
     if (!text || sending || disabled) return;
+    messageInput.focus({ preventScroll: true });
     // Preserve the key on a failed send so retrying cannot create a duplicate.
     if (pending?.text !== text) pending = { text, id: crypto.randomUUID() };
     sending = true;
@@ -180,7 +181,7 @@
       placeholder={`Message #${channel}`}
       bind:value={draft}
       maxlength="10000"
-      disabled={disabled || sending} />
+      disabled={disabled} />
     <button type="submit" disabled={disabled || sending || !draft.trim()}>
       {sending ? "Sending…" : "Send"}
     </button>
