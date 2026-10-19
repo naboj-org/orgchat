@@ -1,16 +1,31 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"mime"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf16"
 
 	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 )
+
+func (s *Server) health(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
+	defer cancel()
+
+	c.Response().Header().Set("Cache-Control", "no-store")
+
+	if err := s.store.db.Ping(ctx).Err(); err != nil {
+		return c.NoContent(http.StatusServiceUnavailable)
+	}
+
+	return c.NoContent(http.StatusOK)
+}
 
 func requireJSON(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {

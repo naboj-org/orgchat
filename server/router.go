@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -21,6 +23,12 @@ func (s *Server) router() *echo.Echo {
 	e.HidePort = true
 	e.HTTPErrorHandler = s.handleRouteError
 	e.Pre(s.browserSecurity)
+
+	e.GET("/healthz", s.health)
+	e.HEAD("/healthz", s.health)
+
+	static := echo.StaticDirectoryHandler(os.DirFS(env("STATIC_DIR", "../frontend/dist")), false)
+	e.Match([]string{http.MethodGet, http.MethodHead}, "/*", static)
 
 	api := e.Group("/api")
 	api.GET("/auth", s.authEndpoint)
@@ -94,9 +102,17 @@ func (s *Server) browserSecurity(next echo.HandlerFunc) echo.HandlerFunc {
 		r := c.Request()
 		w := c.Response()
 
-		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+
+		// Public frontend files can be loaded from other sites, including the
+		// widget loader and iframe. Origin restrictions apply only to the API.
+		if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-cache")
+			return next(c)
+		}
+
+		w.Header().Set("Cache-Control", "no-store")
 
 		// A signed login link may be followed from the identity provider's site.
 		loginNavigation := r.Method == http.MethodGet && r.URL.Path == "/api/auth" &&
