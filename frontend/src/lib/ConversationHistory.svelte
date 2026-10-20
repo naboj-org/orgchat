@@ -44,6 +44,12 @@
     minute: "2-digit",
   });
 
+  const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
+
+  function localDay(timestamp: string) {
+    return new Date(timestamp).toDateString();
+  }
+
   function updateReadPosition() {
     if (!list?.isConnected) return;
     atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
@@ -158,7 +164,12 @@
       </button>
     {/if}
     {#if loading}<p class="notice" role="status">Loading messages…</p>{/if}
-    {#each messages as message (message.id)}
+    {#each messages as message, index (message.id)}
+      {#if index === 0 || localDay(message.createdAt) !== localDay(messages[index - 1].createdAt)}
+        <div class="date-divider">
+          <time datetime={message.createdAt}>{dateFormat.format(new Date(message.createdAt))}</time>
+        </div>
+      {/if}
       <article class="message">
         <span class="message-text">
           <Username
@@ -173,7 +184,7 @@
       </article>
     {/each}
   </div>
-  {#if error}<p class="notice" role="alert">{error}</p>{/if}
+  {#if error}<p class="notice error-notice" role="alert">{error}</p>{/if}
   <form onsubmit={send}>
     <input
       bind:this={messageInput}
@@ -215,6 +226,10 @@
     color: var(--muted);
     padding-inline: var(--conversation-padding, 24px);
     font-size: 14px;
+  }
+
+  .error-notice {
+    color: var(--error-text);
   }
 
   .load-older {
@@ -269,7 +284,23 @@
     overflow-wrap: anywhere;
   }
 
-  time {
+  .date-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px var(--conversation-padding, 24px);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .date-divider::before,
+  .date-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+
+  .message time {
     margin-left: auto;
     color: var(--muted);
     white-space: nowrap;
@@ -282,7 +313,7 @@
       display: block;
     }
 
-    time {
+    .message time {
       margin-left: 8px;
       font-size: 12px;
     }
