@@ -102,7 +102,7 @@ func (s *Server) auth(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	writeJSON(w, http.StatusOK, map[string]any{"currentUser": account.User})
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (Account, string, bool) {
