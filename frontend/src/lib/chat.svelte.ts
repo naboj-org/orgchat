@@ -1,4 +1,4 @@
-import { channelPath, mergeMessages, request } from "./api";
+import { ApiError, channelPath, mergeMessages, request, unauthorizedMessage } from "./api";
 import type {
   Bootstrap,
   Channel,
@@ -206,13 +206,39 @@ export function createChat() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let attempt = 0;
 
-    function openConnection() {
+    function scheduleReconnect(session: number) {
+      if (stopped || session !== generation) return;
+      connected = false;
+      syncing = false;
+      // Invalidate requests from the disconnected session.
+      generation++;
+      timer = setTimeout(
+        () => void openConnection(),
+        Math.min(1000 * 2 ** attempt++, 15000),
+      );
+    }
+
+    async function openConnection() {
       if (stopped) return;
       clearTimeout(timer);
       const session = ++generation;
       connected = false;
       syncing = true;
       loading = false;
+      // A browser cannot expose the HTTP status of a rejected WS upgrade.
+      // Check authorization over HTTP before attempting the connection.
+      try {
+        await request<Bootstrap>("/bootstrap");
+      } catch (cause) {
+        if (stopped || session !== generation) return;
+        error = cause instanceof ApiError && cause.status === 401
+          ? unauthorizedMessage : `Could not load chat: ${String(cause)}`;
+        syncing = false;
+        if (!(cause instanceof ApiError && cause.status === 401)) scheduleReconnect(session);
+        return;
+      }
+      if (stopped || session !== generation) return;
+      let unauthorized = false;
       const ws = new WebSocket(
         `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/ws`,
       );
@@ -234,6 +260,8 @@ export function createChat() {
       };
       ws.onopen = async () => {
         try {
+          // Refresh after subscribing, then merge buffered events so the
+          // preflight-to-socket interval cannot leave a gap in state.
           const bootstrap = await request<Bootstrap>("/bootstrap");
           if (!isCurrent()) return;
           userMap = {};
@@ -264,32 +292,35 @@ export function createChat() {
           attempt = 0;
         } catch (cause) {
           if (!isCurrent()) return;
-          error = `Could not load chat: ${String(cause)}`;
+          unauthorized = cause instanceof ApiError && cause.status === 401;
+          error = unauthorized ? unauthorizedMessage : `Could not load chat: ${String(cause)}`;
           ws.close();
         }
       };
       ws.onerror = () => {
-        if (!stopped) error = "Cannot connect to the chat server.";
+        if (!stopped && session === generation && !unauthorized)
+          error = "Cannot connect to the chat server.";
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (stopped || session !== generation) return;
         connected = false;
         syncing = false;
-        // Invalidate any requests started before the disconnect.
-        generation++;
-        timer = setTimeout(
-          openConnection,
-          Math.min(1000 * 2 ** attempt++, 15000),
-        );
+        if (unauthorized || event.code === 4401) {
+          error = unauthorizedMessage;
+          generation++;
+          return;
+        }
+        // Failed handshakes are opaque; the next attempt checks HTTP auth again.
+        scheduleReconnect(session);
       };
     }
 
     retryConnection = () => {
       generation++;
       socket?.close();
-      openConnection();
+      void openConnection();
     };
-    openConnection();
+    void openConnection();
     stopConnection = () => {
       stopped = true;
       generation++;

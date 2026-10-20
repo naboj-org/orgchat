@@ -31,6 +31,19 @@ export type ServerEvent =
       data: { channelId: string; lastReadMessageId: string };
     };
 
+export const unauthorizedMessage =
+  "You’re not authorized to access orgchat. Please sign in and try again.";
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -42,8 +55,11 @@ export async function request<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(
-      body?.error?.message ?? `Request failed (${response.status})`,
+    throw new ApiError(
+      response.status,
+      response.status === 401
+        ? unauthorizedMessage
+        : body?.error?.message ?? `Request failed (${response.status})`,
     );
   }
   return response.json();
