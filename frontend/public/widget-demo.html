@@ -50,10 +50,24 @@
         Unread channels appear as a count on the launcher.
       </p>
       <p>
-        Start the mock server on port 3001 and the frontend with
-        <strong>pnpm dev</strong>. The mock server generates occasional messages
-        and presence changes. Open the <a href="/" target="_blank" rel="noopener">full chat</a>
+        Start the Go server on port 3001 and the frontend with
+        <strong>pnpm dev</strong>, or serve the built app from the Go server.
+        Sign in normally or provide a signed JWT below. Open the <a href="/" target="_blank" rel="noopener">full chat</a>
         in another tab to see messages synchronize.
+      </p>
+      <h2>Optional authentication token</h2>
+      <p>
+        If there is no usable chat session, the demo supplies this JWT when the
+        widget requests it. The token stays in memory, is never added to the URL,
+        and is exchanged for a session cookie. Paste it before clicking Retry in
+        the widget. Leave blank to use an existing session. Do not share tokens.
+      </p>
+      <label for="auth-token">JWT issued by your backend</label>
+      <input id="auth-token" type="password" autocomplete="off" placeholder="Optional signed JWT" />
+      <p>
+        The widget is hidden when cookies are blocked in its iframe. This demo
+        shares the chat origin; use a different top-level site over HTTPS to
+        exercise third-party cookie restrictions.
       </p>
       <h2>Embed code</h2>
       <code>&lt;script src="https://chat.example.org/widget.js" defer&gt;&lt;/script&gt;</code>
@@ -70,6 +84,11 @@
       <input id="example-input" placeholder="Type something here" />
       <p><a href="/embed.html">View the widget entry point on its own</a></p>
     </main>
+    <script>
+      window.orgchatConfig = {
+        getToken: () => document.getElementById('auth-token').value.trim() || null
+      }
+    </script>
     <script src="./widget.js" defer></script>
   </body>
 </html>

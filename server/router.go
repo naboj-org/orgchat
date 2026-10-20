@@ -32,6 +32,9 @@ func (s *Server) router() *echo.Echo {
 
 	api := e.Group("/api")
 	api.GET("/auth", s.authEndpoint)
+	api.POST("/auth/embed", s.embedAuthEndpoint, requireJSON, middleware.BodyLimit("32K"))
+	api.POST("/cookie-check", s.startCookieCheck)
+	api.GET("/cookie-check", s.finishCookieCheck)
 
 	private := api.Group("", s.requireSession)
 	private.GET("/bootstrap", s.bootstrap)

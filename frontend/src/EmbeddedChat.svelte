@@ -2,13 +2,22 @@
   import { onMount, tick } from "svelte";
   import ConversationHistory from "./lib/ConversationHistory.svelte";
   import { createChat } from "./lib/chat.svelte";
+  import { createEmbedAuth } from "./lib/embed-auth";
 
-  const chat = createChat();
+  let visible = $state(false);
   let expanded = $state(false);
   let launcher: HTMLButtonElement;
   let closeButton: HTMLButtonElement;
   let parentOrigin: string | undefined;
   const framed = window.parent !== window;
+
+  const auth = createEmbedAuth((available) => {
+    visible = available;
+    if (framed && parentOrigin) window.parent.postMessage(
+      { type: "orgchat:visibility", visible: available }, parentOrigin,
+    );
+  });
+  const chat = createChat({ beforeConnect: auth.checkCookies, authenticate: auth.authenticate });
   const unreadCount = $derived(chat.unreadChannels.length);
 
   function notifyParent() {
@@ -53,7 +62,9 @@
         /* Standalone mode needs no parent messaging. */
       }
     }
+    auth.setParentOrigin(parentOrigin);
     function handleMessage(event: MessageEvent) {
+      auth.handleMessage(event);
       if (event.source !== window.parent || event.origin !== parentOrigin)
         return;
       if (event.data?.type === "orgchat:focus") {
@@ -65,6 +76,7 @@
     const disconnect = chat.connect();
     return () => {
       disconnect();
+      auth.dispose();
       window.removeEventListener("message", handleMessage);
     };
   });
@@ -72,11 +84,19 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
+{#if visible}
 <div class="widget" class:expanded class:framed>
   {#if expanded}
     <div class="widget-panel" role="dialog" aria-label="orgchat" tabindex="-1">
       <header class="widget-header">
-        <strong>orgchat</strong>
+        <div class="widget-heading">
+          <strong>orgchat</strong>
+          {#if unreadCount}
+            <span class="widget-badge" role="status" aria-label={`${unreadCount} unread channels`}>
+              {unreadCount}
+            </span>
+          {/if}
+        </div>
         <a
           class="widget-open"
           href="./"
@@ -152,3 +172,4 @@
     </button>
   {/if}
 </div>
+{/if}

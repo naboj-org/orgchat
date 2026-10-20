@@ -1,4 +1,4 @@
-import { ApiError, channelPath, mergeMessages, request, unauthorizedMessage } from "./api";
+import { AuthenticationError, ApiError, channelPath, mergeMessages, request, unauthorizedMessage } from "./api";
 import type {
   Bootstrap,
   Channel,
@@ -10,7 +10,12 @@ import type {
 } from "./api";
 
 // One independent client per call; creating it does not open a connection.
-export function createChat() {
+type ChatOptions = {
+  beforeConnect?: () => Promise<boolean>;
+  authenticate?: () => Promise<void>;
+};
+
+export function createChat(options: ChatOptions = {}) {
   let userMap = $state<Record<string, User>>({});
   let channels = $state<Channel[]>([]);
   let onlineUserIds = $state<string[]>([]);
@@ -228,13 +233,31 @@ export function createChat() {
       // A browser cannot expose the HTTP status of a rejected WS upgrade.
       // Check authorization over HTTP before attempting the connection.
       try {
-        await request<Bootstrap>("/bootstrap");
+        if (options.beforeConnect && !(await options.beforeConnect())) {
+          if (!stopped && session === generation) syncing = false;
+          return;
+        }
+        if (stopped || session !== generation) return;
+        try {
+          await request<Bootstrap>("/bootstrap");
+        } catch (cause) {
+          if (!(cause instanceof ApiError && cause.status === 401) || !options.authenticate) throw cause;
+          if (stopped || session !== generation) return;
+          try {
+            await options.authenticate();
+            if (stopped || session !== generation) return;
+            // Confirm that the session cookie from the exchange was usable.
+            await request<Bootstrap>("/bootstrap");
+          } catch (authFailure) {
+            throw new AuthenticationError(authFailure instanceof Error ? authFailure.message : String(authFailure));
+          }
+        }
       } catch (cause) {
         if (stopped || session !== generation) return;
         error = cause instanceof ApiError && cause.status === 401
           ? unauthorizedMessage : `Could not load chat: ${String(cause)}`;
         syncing = false;
-        if (!(cause instanceof ApiError && cause.status === 401)) scheduleReconnect(session);
+        if (!(cause instanceof AuthenticationError) && !(cause instanceof ApiError && cause.status === 401)) scheduleReconnect(session);
         return;
       }
       if (stopped || session !== generation) return;
@@ -307,7 +330,8 @@ export function createChat() {
         syncing = false;
         if (unauthorized || event.code === 4401) {
           error = unauthorizedMessage;
-          generation++;
+          if (options.authenticate) scheduleReconnect(session);
+          else generation++;
           return;
         }
         // Failed handshakes are opaque; the next attempt checks HTTP auth again.

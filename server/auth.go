@@ -35,6 +35,17 @@ func (s *Server) auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.login(w, r, raw, true)
+}
+
+// Both entry points share token validation, grants, and session creation.
+func (s *Server) login(w http.ResponseWriter, r *http.Request, raw string, redirect bool) {
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	if raw == "" || len(raw) > 16384 {
+		fail(w, http.StatusBadRequest, "INVALID_TOKEN", "Provide a signed JWT of at most 16 KiB.")
+		return
+	}
+
 	options := []jwt.ParserOption{
 		jwt.WithValidMethods([]string{"HS256"}),
 		jwt.WithExpirationRequired(),
@@ -91,18 +102,31 @@ func (s *Server) auth(w http.ResponseWriter, r *http.Request) {
 	// grants require a reconnect so every socket uses the latest account.
 	s.hub.closeStaleUser(account)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   s.secureCookie,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   24 * 60 * 60,
-		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	http.SetCookie(w, s.browserCookie(cookieName, token, 24*60*60))
+	if redirect {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	} else {
+		writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true})
+	}
+}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+// Secure sessions support cross-site iframes where third-party cookies are
+// permitted. Local HTTP development uses Lax; production embeds require HTTPS.
+func (s *Server) browserCookie(name, value string, maxAge int) *http.Cookie {
+	sameSite := http.SameSiteLaxMode
+	if s.secureCookie {
+		sameSite = http.SameSiteNoneMode
+	}
+	return &http.Cookie{
+		Name: name,
+		Value: value,
+		Path: "/",
+		HttpOnly: true,
+		Secure: s.secureCookie,
+		SameSite: sameSite,
+		MaxAge: maxAge,
+		Expires: time.Now().Add(time.Duration(maxAge) * time.Second),
+	}
 }
 
 func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (Account, string, bool) {
@@ -140,8 +164,16 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (Account, 
 func (s *Server) originAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		// Reject cross-site browser requests even when they omit Origin.
-		return r.Header.Get("Sec-Fetch-Site") != "cross-site"
+		if r.Header.Get("Sec-Fetch-Site") != "cross-site" {
+			return true
+		}
+
+		// Cross-site ancestors can taint Fetch Metadata inside an iframe.
+		// Allow read-only HTTP requests without Origin; browsers still prevent
+		// other sites from reading the response through the same-origin policy.
+		// Auth navigation is handled separately, and WS must pass its check.
+		readOnly := r.Method == http.MethodGet || r.Method == http.MethodHead
+		return readOnly && r.URL.Path != "/api/auth" && r.URL.Path != "/api/ws"
 	}
 	if s.origins[origin] {
 		return true

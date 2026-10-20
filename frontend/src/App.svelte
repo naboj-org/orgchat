@@ -11,6 +11,11 @@
   onMount(() => chat.connect());
 </script>
 
+<svelte:head>
+  <title>{chat.unreadChannels.length ? "(*) orgchat" : "orgchat"}</title>
+  <link rel="icon" type="image/svg+xml" href={chat.unreadChannels.length ? "/favicon-unread.svg" : "/favicon.svg"} />
+</svelte:head>
+
 <main class="full-chat">
   <header class="mobile-toolbar">
     <strong class="mobile-title">orgchat</strong>

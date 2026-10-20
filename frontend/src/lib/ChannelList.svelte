@@ -59,6 +59,6 @@
     height: 10px;
     flex-shrink: 0;
     border-radius: 50%;
-    background: currentColor;
+    background: var(--unread);
   }
 </style>

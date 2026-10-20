@@ -49,8 +49,8 @@ body {
   padding-inline: 3px;
   box-sizing: border-box;
   border-radius: 10px;
-  background: var(--text);
-  color: var(--background);
+  background: var(--unread);
+  color: #fff;
   font-size: 12px;
 }
 
@@ -70,12 +70,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--border);
 }
 
-.widget-header strong {
+.widget-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-right: auto;
 }
 

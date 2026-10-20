@@ -288,7 +288,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 16px var(--conversation-padding, 24px);
+    margin: 2px var(--conversation-padding, 24px);
     color: var(--muted);
     font-size: 12px;
   }

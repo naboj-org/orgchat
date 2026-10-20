@@ -34,6 +34,9 @@ export type ServerEvent =
 export const unauthorizedMessage =
   "You’re not authorized to access orgchat. Please sign in and try again.";
 
+// Authentication failures requiring host/user intervention, not a reconnect loop.
+export class AuthenticationError extends Error {}
+
 export class ApiError extends Error {
   readonly status: number;
 
