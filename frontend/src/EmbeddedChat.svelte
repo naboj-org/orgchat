@@ -3,9 +3,12 @@
   import ConversationHistory from "./lib/ConversationHistory.svelte";
   import { createChat } from "./lib/chat.svelte";
   import { createEmbedAuth } from "./lib/embed-auth";
+  import { request } from "./lib/api";
 
   let visible = $state(false);
   let expanded = $state(false);
+  let openingTab = $state(false);
+  let popoutError = $state("");
   let launcher: HTMLButtonElement;
   let closeButton: HTMLButtonElement;
   let parentOrigin: string | undefined;
@@ -21,6 +24,34 @@
   const unreadCount = $derived(chat.unreadChannels.length);
   const activeChannel = $derived(chat.openChannelIds[0] ?? "");
   const conversation = $derived(chat.conversation(activeChannel));
+
+  async function openInNewTab() {
+    if (openingTab) return;
+    popoutError = "";
+    // Open synchronously while the click still grants popup permission.
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      popoutError = "Your browser blocked the new tab. Allow popups for chat and try again.";
+      return;
+    }
+    // Keep a navigation handle without giving the new page access to its opener.
+    tab.opener = null;
+    tab.document.title = "Opening orgchat…";
+    tab.document.body.textContent = "Opening orgchat…";
+    openingTab = true;
+    try {
+      const { token } = await request<{ token: string }>("/auth/popout", { method: "POST" });
+      if (tab.closed) return;
+      const url = new URL("/api/auth", location.origin);
+      url.searchParams.set("token", token);
+      tab.location.replace(url.href);
+    } catch (cause) {
+      tab.close();
+      popoutError = `Could not open chat in a new tab: ${cause instanceof Error ? cause.message : String(cause)}`;
+    } finally {
+      openingTab = false;
+    }
+  }
 
   function notifyParent() {
     if (framed && parentOrigin) {
@@ -99,15 +130,14 @@
             </span>
           {/if}
         </div>
-        <a
+        <button
           class="widget-open"
-          href="./"
-          target="_blank"
-          rel="noopener noreferrer"
+          disabled={openingTab}
+          onclick={openInNewTab}
           aria-label="Open orgchat in a new tab"
           title="Open orgchat in a new tab">
           ↗
-        </a>
+        </button>
         <button
           bind:this={closeButton}
           aria-label="Close chat"
@@ -115,6 +145,12 @@
           ×
         </button>
       </header>
+      {#if popoutError}
+        <div class="connection-status error" role="alert">
+          <span>{popoutError}</span>
+          <button disabled={openingTab} onclick={openInNewTab}>Try again</button>
+        </div>
+      {/if}
       <div class="widget-channels">
         <label for="widget-channel">Channel</label>
         <select

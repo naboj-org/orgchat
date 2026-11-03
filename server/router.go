@@ -37,6 +37,7 @@ func (s *Server) router() *echo.Echo {
 	api.GET("/cookie-check", s.finishCookieCheck)
 
 	private := api.Group("", s.requireSession)
+	private.POST("/auth/popout", s.popoutAuthEndpoint)
 	private.GET("/bootstrap", s.bootstrap)
 	private.GET("/ws", s.websocketEndpoint)
 

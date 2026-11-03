@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -17,6 +19,38 @@ func (s *Server) embedAuthEndpoint(c echo.Context) error {
 	}
 	s.login(c.Response(), c.Request(), body.Token, false)
 	return nil
+}
+
+// Mint only from the authenticated account, never from client-supplied grants.
+// The new tab exchanges this short-lived credential through the existing login.
+func (s *Server) popoutAuthEndpoint(c echo.Context) error {
+	account := requestAccount(c)
+	now := time.Now()
+	claims := AuthClaims{
+		User:     account.User,
+		Channels: account.Channels,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    s.issuer,
+			Subject:   account.User.ID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(30 * time.Second)),
+		},
+	}
+	if s.audience != "" {
+		claims.Audience = jwt.ClaimStrings{s.audience}
+	}
+
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+	if err != nil {
+		s.internalError(c.Response(), err)
+		return nil
+	}
+	if len(token) > 16384 {
+		fail(c.Response(), http.StatusBadRequest, "TOKEN_TOO_LARGE", "Chat access is too large to open in a new tab.")
+		return nil
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"token": token})
 }
 
 const cookieCheckPrefix = "orgchat_probe_"
