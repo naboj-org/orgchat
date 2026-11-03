@@ -32,7 +32,7 @@ export type ServerEvent =
     };
 
 export const unauthorizedMessage =
-  "You’re not authorized to access orgchat. Please sign in and try again.";
+  "Your chat access is no longer valid. Return to the app you opened orgchat from and open the chat again to refresh your access.";
 
 // Authentication failures requiring host/user intervention, not a reconnect loop.
 export class AuthenticationError extends Error {}
