@@ -1,14 +1,65 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ChannelList from "./lib/ChannelList.svelte";
-  import ConversationHistory from "./lib/ConversationHistory.svelte";
+  import ConversationPane from "./lib/ConversationPane.svelte";
   import OnlineUsers from "./lib/OnlineUsers.svelte";
   import { createChat } from "./lib/chat.svelte";
 
   const chat = createChat();
   let mobilePanel = $state<"channels" | "users" | null>(null);
 
-  onMount(() => chat.connect());
+  let largeScreen = $state(false);
+  let focusedChannelId = $state("");
+  let paneNotice = $state("");
+
+  $effect(() => {
+    if (!chat.openChannelIds.includes(focusedChannelId)) {
+      focusedChannelId = chat.openChannelIds[0] ?? "";
+    }
+  });
+
+  function selectChannel(id: string, event: MouseEvent) {
+    mobilePanel = null;
+    paneNotice = "";
+    if (chat.openChannelIds.includes(id)) {
+      focusedChannelId = id;
+      return;
+    }
+    if (largeScreen && (event.ctrlKey || event.metaKey)) {
+      if (chat.openChannelIds.length >= 4) {
+        paneNotice = "Up to 4 conversations can be open. Close a pane to open another.";
+        return;
+      }
+      chat.setOpenChannels([...chat.openChannelIds, id]);
+    } else {
+      const target = chat.openChannelIds.includes(focusedChannelId)
+        ? focusedChannelId : chat.openChannelIds[0];
+      chat.setOpenChannels(target
+        ? chat.openChannelIds.map(open => open === target ? id : open) : [id]);
+    }
+    focusedChannelId = id;
+  }
+
+  function closePane(id: string) {
+    if (chat.openChannelIds.length <= 1) return;
+    const index = chat.openChannelIds.indexOf(id);
+    const remaining = chat.openChannelIds.filter(open => open !== id);
+    chat.setOpenChannels(remaining);
+    if (focusedChannelId === id) focusedChannelId = remaining[Math.min(index, remaining.length - 1)]!;
+    paneNotice = "";
+  }
+
+  onMount(() => {
+    const media = window.matchMedia("(min-width: 901px)");
+    const update = () => { largeScreen = media.matches };
+    update();
+    media.addEventListener("change", update);
+    const disconnect = chat.connect();
+    return () => {
+      disconnect();
+      media.removeEventListener("change", update);
+    };
+  });
 </script>
 
 <svelte:head>
@@ -40,13 +91,12 @@
     class:open={mobilePanel === "channels"}>
     <ChannelList
       channels={chat.channels.map((channel) => channel.id)}
-      activeChannel={chat.activeChannel}
+      activeChannel={focusedChannelId}
+      openChannels={chat.openChannelIds}
+      allowMultiple={largeScreen}
       unreadChannels={chat.unreadChannels}
       disabled={!chat.connected || chat.syncing}
-      onSelect={(id) => {
-        mobilePanel = null;
-        void chat.selectChannel(id);
-      }} />
+      onSelect={selectChannel} />
   </div>
 
   <div class="conversation">
@@ -59,23 +109,22 @@
         <button onclick={chat.retry}>Retry</button>
       </div>
     {/if}
-    {#if chat.activeChannel}
-      {#key chat.activeChannel}
-        <ConversationHistory
-          channel={chat.channels.find(
-            (channel) => channel.id === chat.activeChannel,
-          )?.name ?? chat.activeChannel}
-          messages={chat.messages}
-          users={chat.users}
-          disabled={!chat.connected || chat.syncing || chat.loading}
-          loading={chat.loading}
-          autoFocus
-          hasOlder={chat.hasOlder}
-          onLoadOlder={chat.loadOlder}
-          onSend={chat.send}
-          onRead={chat.markRead} />
-      {/key}
+    {#if paneNotice}
+      <div class="pane-notice" role="status">{paneNotice}</div>
     {/if}
+    <div class="conversation-panes" style:--pane-count={largeScreen ? chat.openChannelIds.length || 1 : 1}>
+      {#each chat.openChannelIds as channelId (channelId)}
+        <ConversationPane
+          {chat}
+          {channelId}
+          focused={focusedChannelId === channelId}
+          visible={largeScreen || focusedChannelId === channelId}
+          closable={largeScreen && chat.openChannelIds.length > 1}
+          onFocus={() => { focusedChannelId = channelId }}
+          onClose={() => closePane(channelId)}
+        />
+      {/each}
+    </div>
   </div>
 
   <div id="user-panel" class="sidebar" class:open={mobilePanel === "users"}>

@@ -9,12 +9,12 @@ import type {
   User,
 } from "./api";
 
-// One independent client per call; creating it does not open a connection.
 type ChatOptions = {
   beforeConnect?: () => Promise<boolean>;
   authenticate?: () => Promise<void>;
 };
 
+// One independent client per call; creating it does not open a connection.
 export function createChat(options: ChatOptions = {}) {
   let userMap = $state<Record<string, User>>({});
   let channels = $state<Channel[]>([]);
@@ -22,14 +22,15 @@ export function createChat(options: ChatOptions = {}) {
   let currentUserId = $state("");
   let history = $state<Record<string, Message[]>>({});
   let cursors = $state<Record<string, string | null>>({});
-  let activeChannel = $state("");
+  let openChannelIds = $state<string[]>([]);
   let connected = $state(false);
   let syncing = $state(true);
-  let loading = $state(false);
+  let loading = $state<Record<string, boolean>>({});
+  let channelErrors = $state<Record<string, string>>({});
   let error = $state("");
   let retryConnection: () => void = () => {};
   let generation = 0;
-  let selection = 0;
+  const loads = new Map<string, { session: number; promise: Promise<void> }>();
   const reading = new Set<string>();
   const pendingReads = new Map<string, string>();
 
@@ -115,28 +116,56 @@ export function createChat(options: ChatOptions = {}) {
     }
   }
 
-  async function selectChannel(id: string) {
-    activeChannel = id;
-    const version = ++selection;
+  function loadChannel(id: string): Promise<void> {
+    channelErrors[id] = "";
+    if (Object.hasOwn(cursors, id)) return Promise.resolve();
+    const existing = loads.get(id);
+    if (existing?.session === generation) return existing.promise;
     const session = generation;
-    loading = true;
-    error = "";
-    try {
-      const page = await request<MessagePage>(`${channelPath(id)}/messages`);
-      if (session !== generation) return;
-      cacheUsers(page.users);
-      history[id] = mergeMessages(history[id] ?? [], page.messages);
-      cursors[id] = page.nextBefore;
-    } catch (cause) {
-      if (session === generation && version === selection)
-        error = String(cause);
-    } finally {
-      if (session === generation && version === selection) loading = false;
+    loading[id] = true;
+    channelErrors[id] = "";
+    const promise = (async () => {
+      try {
+        const page = await request<MessagePage>(`${channelPath(id)}/messages`);
+        if (session !== generation) return;
+        cacheUsers(page.users);
+        history[id] = mergeMessages(history[id] ?? [], page.messages);
+        cursors[id] = page.nextBefore;
+      } catch (cause) {
+        if (session === generation) {
+          channelErrors[id] = String(cause);
+          if (syncing && cause instanceof ApiError && cause.status === 401) throw cause;
+        }
+      } finally {
+        if (session === generation) {
+          loading[id] = false;
+          loads.delete(id);
+        }
+      }
+    })();
+    loads.set(id, { session, promise });
+    return promise;
+  }
+
+  function setOpenChannels(ids: string[]) {
+    openChannelIds = [...new Set(ids)]
+      .filter(id => channels.some(channel => channel.id === id)).slice(0, 4);
+    if (connected && !syncing) {
+      for (const id of openChannelIds) void loadChannel(id);
     }
   }
 
-  async function loadOlder() {
-    const id = activeChannel;
+  // Values are read through this function so callers can derive per-pane state.
+  function conversation(id: string) {
+    return {
+      messages: history[id] ?? [],
+      hasOlder: !!cursors[id],
+      loading: !!loading[id],
+      error: channelErrors[id] ?? "",
+    };
+  }
+
+  async function loadOlder(id: string) {
     const cursor = cursors[id];
     const session = generation;
     if (!cursor) return;
@@ -149,15 +178,11 @@ export function createChat(options: ChatOptions = {}) {
     cursors[id] = page.nextBefore;
   }
 
-  async function send(text: string, clientMessageId: string) {
-    const id = activeChannel;
+  async function send(id: string, text: string, clientMessageId: string) {
     const session = generation;
     const { message, author } = await request<MessageResult>(
       `${channelPath(id)}/messages`,
-      {
-        method: "POST",
-        body: JSON.stringify({ text, clientMessageId }),
-      },
+      { method: "POST", body: JSON.stringify({ text, clientMessageId }) },
     );
     if (session === generation) {
       cacheUsers([author]);
@@ -170,7 +195,7 @@ export function createChat(options: ChatOptions = {}) {
     if (
       !connected ||
       syncing ||
-      loading ||
+      loading[id] ||
       !channel ||
       channel.lastReadMessageId === messageId
     )
@@ -189,10 +214,12 @@ export function createChat(options: ChatOptions = {}) {
         method: "PUT",
         body: JSON.stringify({ lastReadMessageId: messageId }),
       });
-      if (session === generation) applyEvent({ type: "channel.read", data });
+      if (session === generation) {
+        applyEvent({ type: "channel.read", data });
+      }
     } catch (cause) {
       if (session === generation)
-        error = `Could not mark messages read: ${String(cause)}`;
+        channelErrors[id] = `Could not mark messages read: ${String(cause)}`;
     } finally {
       reading.delete(id);
       const pending = pendingReads.get(id);
@@ -229,7 +256,7 @@ export function createChat(options: ChatOptions = {}) {
       const session = ++generation;
       connected = false;
       syncing = true;
-      loading = false;
+      loading = {};
       // A browser cannot expose the HTTP status of a rejected WS upgrade.
       // Check authorization over HTTP before attempting the connection.
       try {
@@ -292,21 +319,14 @@ export function createChat(options: ChatOptions = {}) {
           currentUserId = bootstrap.currentUser.id;
           channels = bootstrap.channels;
           onlineUserIds = [];
-          if (!channels.some((channel) => channel.id === activeChannel))
-            activeChannel = channels[0]?.id ?? "";
+          openChannelIds = openChannelIds.filter(id => channels.some(channel => channel.id === id));
+          if (!openChannelIds.length && channels[0]) openChannelIds = [channels[0].id];
           // Drop stale caches on reconnect: there is no server event replay.
           history = {};
           cursors = {};
-          if (activeChannel) {
-            const id = activeChannel;
-            const page = await request<MessagePage>(
-              `${channelPath(id)}/messages`,
-            );
-            if (!isCurrent()) return;
-            cacheUsers(page.users);
-            history[id] = page.messages;
-            cursors[id] = page.nextBefore;
-          }
+          channelErrors = {};
+          await Promise.all(openChannelIds.map(loadChannel));
+          if (!isCurrent()) return;
           for (const event of buffered) applyEvent(event);
           ready = true;
           connected = true;
@@ -362,8 +382,8 @@ export function createChat(options: ChatOptions = {}) {
     get channels() {
       return channels;
     },
-    get activeChannel() {
-      return activeChannel;
+    get openChannelIds() {
+      return openChannelIds;
     },
     get users() {
       return userMap;
@@ -374,29 +394,24 @@ export function createChat(options: ChatOptions = {}) {
     get unreadChannels() {
       return unreadChannels;
     },
-    get messages() {
-      return history[activeChannel] ?? [];
-    },
-    get hasOlder() {
-      return !!cursors[activeChannel];
-    },
     get connected() {
       return connected;
     },
     get syncing() {
       return syncing;
     },
-    get loading() {
-      return loading;
-    },
     get error() {
       return error;
     },
     connect,
-    selectChannel,
+    setOpenChannels,
+    loadChannel,
+    conversation,
     loadOlder,
     send,
     markRead,
     retry: () => retryConnection(),
   };
 }
+
+export type Chat = ReturnType<typeof createChat>;

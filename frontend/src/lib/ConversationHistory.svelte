@@ -15,6 +15,7 @@
     loading = false,
     showHeading = true,
     autoFocus = false,
+    readEnabled = true,
   }: {
     channel: string;
     messages: Message[];
@@ -27,6 +28,7 @@
     loading?: boolean;
     showHeading?: boolean;
     autoFocus?: boolean;
+    readEnabled?: boolean;
   } = $props();
 
   let draft = $state("");
@@ -36,6 +38,7 @@
   let list: HTMLDivElement;
   let messageInput: HTMLInputElement;
   let focusedInitially = false;
+  let visibleInViewport = $state(false);
   let atBottom = true;
   let restoring = false;
   let pending: { text: string; id: string } | undefined;
@@ -51,7 +54,7 @@
   }
 
   function updateReadPosition() {
-    if (!list?.isConnected) return;
+    if (!list?.isConnected || !readEnabled || !visibleInViewport) return;
     atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
     const latest = messages.at(-1);
     if (
@@ -59,6 +62,8 @@
       atBottom &&
       !disabled &&
       !restoring &&
+      readEnabled &&
+      visibleInViewport &&
       document.visibilityState === "visible"
     ) {
       onRead(latest.channelId, latest.id);
@@ -67,7 +72,7 @@
 
   $effect(() => {
     const latestId = messages.at(-1)?.id;
-    const blocked = disabled;
+    const blocked = disabled || !readEnabled || !visibleInViewport;
     if (!latestId || blocked || restoring) return;
     let cancelled = false;
     tick().then(() => {
@@ -83,6 +88,7 @@
   $effect(() => {
     if (
       !autoFocus ||
+      !visibleInViewport ||
       disabled ||
       focusedInitially ||
       !window.matchMedia("(hover: hover) and (pointer: fine)").matches
@@ -100,9 +106,15 @@
   });
 
   onMount(() => {
+    // Horizontally scrolled-out or hidden panes must not mark messages read.
+    const observer = new IntersectionObserver(([entry]) => {
+      visibleInViewport = !!entry && entry.isIntersecting && entry.intersectionRatio >= 0.95;
+    }, { threshold: [0, 0.95, 1] });
+    observer.observe(list);
     document.addEventListener("visibilitychange", updateReadPosition);
     window.addEventListener("focus", updateReadPosition);
     return () => {
+      observer.disconnect();
       document.removeEventListener("visibilitychange", updateReadPosition);
       window.removeEventListener("focus", updateReadPosition);
     };

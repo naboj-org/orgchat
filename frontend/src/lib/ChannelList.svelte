@@ -4,13 +4,17 @@
     activeChannel,
     unreadChannels = [],
     disabled = false,
+    openChannels = [],
+    allowMultiple = false,
     onSelect,
   }: {
     channels: Channel[];
     activeChannel: Channel;
     unreadChannels?: Channel[];
     disabled?: boolean;
-    onSelect: (channel: Channel) => void;
+    openChannels?: Channel[];
+    allowMultiple?: boolean;
+    onSelect: (channel: Channel, event: MouseEvent) => void;
   } = $props();
 </script>
 
@@ -21,12 +25,14 @@
       <li>
         <button
           {disabled}
+          class:open={openChannels.includes(channel)}
+          title={allowMultiple ? "Click to replace the focused pane; Ctrl/Cmd+click to open alongside (max 4)" : undefined}
           class:active={activeChannel === channel}
           aria-pressed={activeChannel === channel}
           aria-label={unreadChannels.includes(channel)
             ? `#${channel}, unread messages`
             : `#${channel}`}
-          onclick={() => onSelect(channel)}>
+          onclick={(event) => onSelect(channel, event)}>
           <span>#{channel}</span>
           {#if unreadChannels.includes(channel)}
             <span class="unread-dot" aria-hidden="true"></span>
@@ -46,6 +52,7 @@
     padding: 8px 10px;
   }
 
+  button.open,
   button.active {
     font-weight: 600;
   }

@@ -19,6 +19,8 @@
   });
   const chat = createChat({ beforeConnect: auth.checkCookies, authenticate: auth.authenticate });
   const unreadCount = $derived(chat.unreadChannels.length);
+  const activeChannel = $derived(chat.openChannelIds[0] ?? "");
+  const conversation = $derived(chat.conversation(activeChannel));
 
   function notifyParent() {
     if (framed && parentOrigin) {
@@ -117,9 +119,9 @@
         <label for="widget-channel">Channel</label>
         <select
           id="widget-channel"
-          value={chat.activeChannel}
+          value={activeChannel}
           disabled={!chat.connected || chat.syncing}
-          onchange={(event) => chat.selectChannel(event.currentTarget.value)}>
+          onchange={(event) => chat.setOpenChannels([event.currentTarget.value])}>
           {#if !chat.channels.length}<option value="">Loading…</option>{/if}
           {#each chat.channels as channel (channel.id)}
             <option value={channel.id}>
@@ -128,29 +130,29 @@
           {/each}
         </select>
       </div>
-      {#if !chat.connected || chat.error}
-        <div class="connection-status" class:error={!!chat.error} role="status">
+      {#if !chat.connected || chat.error || conversation.error}
+        <div class="connection-status" class:error={!!chat.error || !!conversation.error} role="status">
           <span>
-            {chat.error ||
+            {chat.error || conversation.error ||
               (chat.syncing ? "Connecting…" : "Disconnected. Reconnecting…")}
           </span>
-          <button onclick={chat.retry}>Retry</button>
+          <button onclick={() => chat.connected && !chat.error ? chat.loadChannel(activeChannel) : chat.retry()}>Retry</button>
         </div>
       {/if}
-      {#if chat.activeChannel}
-        {#key chat.activeChannel}
+      {#if activeChannel}
+        {#key activeChannel}
           <ConversationHistory
             channel={chat.channels.find(
-              (channel) => channel.id === chat.activeChannel,
-            )?.name ?? chat.activeChannel}
-            messages={chat.messages}
+              (channel) => channel.id === activeChannel,
+            )?.name ?? activeChannel}
+            messages={conversation.messages}
             users={chat.users}
-            disabled={!chat.connected || chat.syncing || chat.loading}
-            loading={chat.loading}
-            hasOlder={chat.hasOlder}
+            disabled={!chat.connected || chat.syncing || conversation.loading}
+            loading={conversation.loading}
+            hasOlder={conversation.hasOlder}
             showHeading={false}
-            onLoadOlder={chat.loadOlder}
-            onSend={chat.send}
+            onLoadOlder={() => chat.loadOlder(activeChannel)}
+            onSend={(text, clientMessageId) => chat.send(activeChannel, text, clientMessageId)}
             onRead={chat.markRead} />
         {/key}
       {/if}
