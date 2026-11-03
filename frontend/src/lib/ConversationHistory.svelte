@@ -45,6 +45,7 @@
   const timeFormat = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
@@ -190,7 +191,7 @@
         </span>
         <time
           datetime={message.createdAt}
-          title={new Date(message.createdAt).toLocaleString()}>
+          title={new Date(message.createdAt).toLocaleString(undefined, { hourCycle: "h23" })}>
           ({timeFormat.format(new Date(message.createdAt))})
         </time>
       </article>
