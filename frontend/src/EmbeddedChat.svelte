@@ -55,27 +55,38 @@
   async function openInNewTab() {
     if (openingTab) return;
     popoutError = "";
-    // Open synchronously while the click still grants popup permission.
-    const tab = window.open("about:blank", "_blank");
+    // Navigate immediately, while the click still grants popup permission.
+    // Do not access a blank popup's document or navigate it after an await:
+    // browser isolation rules can prevent that from a cross-site iframe.
+    const tab = window.open(new URL("/popout.html", location.origin).href, "_blank");
     if (!tab) {
       popoutError = "Your browser blocked the new tab. Allow popups for chat and try again.";
       return;
     }
-    // Keep a navigation handle without giving the new page access to its opener.
-    tab.opener = null;
-    tab.document.title = "Opening orgchat…";
-    tab.document.body.textContent = "Opening orgchat…";
     openingTab = true;
+    let handleMessage: (event: MessageEvent) => void = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const { token } = await request<{ token: string }>("/auth/popout", { method: "POST" });
+      const ready = new Promise<void>((resolve, reject) => {
+        handleMessage = (event) => {
+          if (event.source === tab && event.origin === location.origin &&
+              event.data?.type === "orgchat:popout-ready") resolve();
+        };
+        window.addEventListener("message", handleMessage);
+        timer = setTimeout(() => reject(new Error("The chat tab did not finish loading. Please try again.")), 20000);
+      });
+      const [{ token }] = await Promise.all([
+        request<{ token: string }>("/auth/popout", { method: "POST" }),
+        ready,
+      ]);
       if (tab.closed) return;
-      const url = new URL("/api/auth", location.origin);
-      url.searchParams.set("token", token);
-      tab.location.replace(url.href);
+      tab.postMessage({ type: "orgchat:popout-token", token }, location.origin);
     } catch (cause) {
       tab.close();
       popoutError = `Could not open chat in a new tab: ${cause instanceof Error ? cause.message : String(cause)}`;
     } finally {
+      clearTimeout(timer);
+      window.removeEventListener("message", handleMessage);
       openingTab = false;
     }
   }
