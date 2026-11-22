@@ -1,3 +1,9 @@
+:root {
+  /* Match the host iframe's scheme so its transparent canvas stays transparent.
+     Widget colors still follow prefers-color-scheme via ui.css. */
+  color-scheme: normal;
+}
+
 :root,
 body {
   background: transparent;
