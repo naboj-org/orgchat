@@ -200,10 +200,11 @@
       aria-label={unreadCount
         ? `Open chat, ${unreadCount} unread channels`
         : "Open chat"}
+      title="Open chat"
       aria-expanded="false"
       aria-haspopup="dialog"
       onclick={() => setExpanded(true)}>
-      orgchat
+      <img src="/favicon.svg" width="32" height="32" alt="" aria-hidden="true" />
       {#if unreadCount}<span class="widget-badge" aria-hidden="true">
           {unreadCount}
         </span>{/if}

@@ -15,8 +15,8 @@
     position: 'fixed',
     right: 'max(16px, env(safe-area-inset-right))',
     bottom: 'max(16px, env(safe-area-inset-bottom))',
-    width: 'min(380px, calc(100vw - 32px))',
-    height: '56px',
+    width: '48px',
+    height: '48px',
     border: '0',
     borderRadius: '12px',
     background: 'transparent',
@@ -26,11 +26,11 @@
 
   function resize(expanded) {
     const mobile = window.matchMedia('(max-width: 480px)').matches;
-    frame.style.width = mobile && !expanded
-      ? '144px' : 'min(380px, calc(100vw - 32px))';
+    frame.style.width = expanded
+      ? 'min(380px, calc(100vw - 32px))' : '48px';
     frame.style.height = expanded
       ? (mobile ? 'min(480px, 70dvh)' : 'min(540px, calc(100dvh - 32px))')
-      : (mobile ? '44px' : '56px');
+      : '48px';
   }
 
   let expanded = false;
