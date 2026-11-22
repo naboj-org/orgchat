@@ -55,38 +55,26 @@
   async function openInNewTab() {
     if (openingTab) return;
     popoutError = "";
-    // Navigate immediately, while the click still grants popup permission.
-    // Do not access a blank popup's document or navigate it after an await:
-    // browser isolation rules can prevent that from a cross-site iframe.
-    const tab = window.open(new URL("/popout.html", location.origin).href, "_blank");
+    // Open during the click; the random fragment lets the new tab claim its
+    // session without window.opener (which browser isolation may remove).
+    const handoff = Array.from(crypto.getRandomValues(new Uint8Array(32)),
+      byte => byte.toString(16).padStart(2, "0")).join("");
+    const url = new URL("/popout.html", location.origin);
+    url.hash = handoff;
+    const tab = window.open(url.href, "_blank");
     if (!tab) {
       popoutError = "Your browser blocked the new tab. Allow popups for chat and try again.";
       return;
     }
     openingTab = true;
-    let handleMessage: (event: MessageEvent) => void = () => {};
-    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const ready = new Promise<void>((resolve, reject) => {
-        handleMessage = (event) => {
-          if (event.source === tab && event.origin === location.origin &&
-              event.data?.type === "orgchat:popout-ready") resolve();
-        };
-        window.addEventListener("message", handleMessage);
-        timer = setTimeout(() => reject(new Error("The chat tab did not finish loading. Please try again.")), 20000);
+      await request<void>("/auth/popout", {
+        method: "POST",
+        body: JSON.stringify({ handoff }),
       });
-      const [{ token }] = await Promise.all([
-        request<{ token: string }>("/auth/popout", { method: "POST" }),
-        ready,
-      ]);
-      if (tab.closed) return;
-      tab.postMessage({ type: "orgchat:popout-token", token }, location.origin);
     } catch (cause) {
-      tab.close();
       popoutError = `Could not open chat in a new tab: ${cause instanceof Error ? cause.message : String(cause)}`;
     } finally {
-      clearTimeout(timer);
-      window.removeEventListener("message", handleMessage);
       openingTab = false;
     }
   }

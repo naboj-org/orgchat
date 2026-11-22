@@ -1,40 +1,34 @@
-// This top-level page signs itself in; the cross-site widget only sends a token.
-(() => {
-  const opener = window.opener;
+// Claim a one-time session handoff without relying on window.opener.
+(async () => {
   const status = document.getElementById('status');
-  if (!opener) {
+  const handoff = location.hash.slice(1);
+  // Remove the bearer credential from the visible URL/history immediately.
+  history.replaceState(null, '', location.pathname);
+  window.opener = null;
+  if (!/^[a-f0-9]{64}$/.test(handoff)) {
     status.textContent = 'Return to the website and open chat from the widget again.';
     return;
   }
 
-  const timer = setTimeout(() => {
-    window.removeEventListener('message', receiveToken);
-    window.opener = null;
-    status.textContent = 'Opening chat timed out. Close this tab and try again from the widget.';
-  }, 25000);
-
-  async function receiveToken(event) {
-    if (event.source !== opener || event.origin !== location.origin ||
-        event.data?.type !== 'orgchat:popout-token') return;
-    const token = event.data.token;
-    if (typeof token !== 'string' || !token || token.length > 16384) return;
-    window.removeEventListener('message', receiveToken);
-    clearTimeout(timer);
-    window.opener = null;
-    try {
-      const response = await fetch('/api/auth/embed', {
+  const deadline = Date.now() + 25000;
+  try {
+    while (Date.now() < deadline) {
+      const response = await fetch('/api/auth/popout/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-        signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({ handoff }),
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
       });
+      if (response.status === 202) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
       if (!response.ok) throw new Error(`Sign-in failed (${response.status}).`);
       location.replace('/');
-    } catch (cause) {
-      status.textContent = `Could not open chat: ${cause instanceof Error ? cause.message : String(cause)} Close this tab and try again from the widget.`;
+      return;
     }
+    throw new Error('Opening chat timed out.');
+  } catch (cause) {
+    status.textContent = `Could not open chat: ${cause instanceof Error ? cause.message : String(cause)} Close this tab and try again from the widget.`;
   }
-
-  window.addEventListener('message', receiveToken);
-  opener.postMessage({ type: 'orgchat:popout-ready' }, location.origin);
 })();

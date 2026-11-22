@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 )
 
 func (s *Server) embedAuthEndpoint(c echo.Context) error {
@@ -23,7 +24,29 @@ func (s *Server) embedAuthEndpoint(c echo.Context) error {
 
 // Mint only from the authenticated account, never from client-supplied grants.
 // The new tab exchanges this short-lived credential through the existing login.
+func validHandoff(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, char := range value {
+		if !(char >= '0' && char <= '9') && !(char >= 'a' && char <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Server) popoutAuthEndpoint(c echo.Context) error {
+	var body struct {
+		Handoff string `json:"handoff"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return err
+	}
+	if !validHandoff(body.Handoff) {
+		fail(c.Response(), http.StatusBadRequest, "INVALID_HANDOFF", "Provide a valid popout handoff.")
+		return nil
+	}
 	account := requestAccount(c)
 	now := time.Now()
 	claims := AuthClaims{
@@ -51,7 +74,39 @@ func (s *Server) popoutAuthEndpoint(c echo.Context) error {
 		return nil
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{"token": token})
+	created, err := s.store.db.SetNX(c.Request().Context(), key("popout", body.Handoff), token, 30*time.Second).Result()
+	if err != nil {
+		s.internalError(c.Response(), err)
+		return nil
+	}
+	if !created {
+		return c.NoContent(http.StatusConflict)
+	}
+	return c.JSON(http.StatusOK, map[string]bool{"ready": true})
+}
+
+// The random handoff is a short-lived bearer credential. Claiming it is atomic
+// and requires no existing cookie or relationship with the opening window.
+func (s *Server) claimPopoutAuth(c echo.Context) error {
+	var body struct {
+		Handoff string `json:"handoff"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return err
+	}
+	if !validHandoff(body.Handoff) {
+		return c.NoContent(http.StatusBadRequest)
+	}
+	token, err := s.store.db.GetDel(c.Request().Context(), key("popout", body.Handoff)).Result()
+	if err == redis.Nil {
+		return c.NoContent(http.StatusAccepted)
+	}
+	if err != nil {
+		s.internalError(c.Response(), err)
+		return nil
+	}
+	s.login(c.Response(), c.Request(), token, false)
+	return nil
 }
 
 const cookieCheckPrefix = "orgchat_probe_"
