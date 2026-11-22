@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import ConversationHistory from './ConversationHistory.svelte'
+  import ChannelDescription from './ChannelDescription.svelte'
   import type { Chat } from './chat.svelte'
 
   let { chat, channelId, focused, visible, closable, onFocus, onClose }: {
@@ -39,6 +40,15 @@
 >
   <header class="pane-header">
     <h1>#{channelName}</h1>
+    <div class="pane-description">
+      <ChannelDescription
+        inline
+        description={chat.channels.find(channel => channel.id === channelId)?.description ?? ""}
+        editable={chat.admin}
+        disabled={!chat.connected || chat.syncing}
+        onSave={(description) => chat.setChannelDescription(channelId, description)}
+      />
+    </div>
     {#if closable}
       <button
         aria-label={`Close #${channelName}`}

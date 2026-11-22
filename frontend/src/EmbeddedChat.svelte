@@ -219,6 +219,8 @@
             channel={chat.channels.find(
               (channel) => channel.id === activeChannel,
             )?.name ?? activeChannel}
+            description={chat.channels.find(channel => channel.id === activeChannel)?.description ?? ""}
+            compactDescription
             messages={conversation.messages}
             users={chat.users}
             disabled={!chat.connected || chat.syncing || conversation.loading}

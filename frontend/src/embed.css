@@ -153,6 +153,7 @@ body {
 
 .widget-panel > section {
   flex: 1;
+  padding-top: 6px;
 }
 
 .widget-panel .connection-status {

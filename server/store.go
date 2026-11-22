@@ -66,6 +66,19 @@ func (s *Store) saveAccount(ctx context.Context, account Account, token string) 
 	return err
 }
 
+// Channel metadata has no TTL and is independent of message retention and JWT grants.
+func (s *Store) channelDescription(ctx context.Context, channel string) (string, error) {
+	description, err := s.db.Get(ctx, key("channel", channel, "description")).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return description, err
+}
+
+func (s *Store) setChannelDescription(ctx context.Context, channel, description string) error {
+	return s.db.Set(ctx, key("channel", channel, "description"), description, 0).Err()
+}
+
 func decodeMessage(channel string, entry redis.XMessage) Message {
 	return Message{
 		ID:        entry.ID,

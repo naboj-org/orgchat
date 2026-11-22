@@ -42,6 +42,7 @@ func (s *Server) router() *echo.Echo {
 	private.GET("/ws", s.websocketEndpoint)
 
 	channels := private.Group("/channels/:channelId", s.requireChannel)
+	channels.PUT("/description", s.updateChannelDescription, s.requireAdmin, requireJSON, middleware.BodyLimit("32K"))
 	channels.GET("/messages", s.history)
 	channels.POST("/messages", s.send, requireJSON, middleware.BodyLimit("32K"))
 	channels.PUT("/read", s.markRead, requireJSON, middleware.BodyLimit("32K"))

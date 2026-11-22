@@ -3,6 +3,7 @@ export type PresenceUser = User & { channelIds: string[] };
 export type Channel = {
   id: string;
   name: string;
+  description: string;
   unread: boolean;
   lastReadMessageId: string | null;
 };
@@ -20,7 +21,9 @@ export type MessagePage = {
   nextBefore: string | null;
 };
 export type MessageResult = { message: Message; author: User };
+export type ChannelDescription = { channelId: string; description: string };
 export type ServerEvent =
+  | { type: "channel.description.updated"; data: ChannelDescription }
   | { type: "message.created"; data: MessageResult }
   | { type: "presence.snapshot"; data: { users: PresenceUser[] } }
   | {

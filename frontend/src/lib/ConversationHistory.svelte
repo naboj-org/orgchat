@@ -1,10 +1,15 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Username from "./Username.svelte";
+  import ChannelDescription from "./ChannelDescription.svelte";
   import type { Message, User } from "./api";
 
   let {
     channel,
+    description = "",
+    canEditDescription = false,
+    compactDescription = false,
+    onSaveDescription,
     messages,
     users,
     onSend,
@@ -18,6 +23,10 @@
     readEnabled = true,
   }: {
     channel: string;
+    description?: string;
+    canEditDescription?: boolean;
+    compactDescription?: boolean;
+    onSaveDescription?: (description: string) => Promise<void>;
     messages: Message[];
     users: Record<string, User>;
     onSend: (text: string, clientMessageId: string) => Promise<void>;
@@ -167,6 +176,13 @@
 
 <section aria-label="Conversation history">
   {#if showHeading}<h1>#{channel}</h1>{/if}
+  <ChannelDescription
+    {description}
+    editable={canEditDescription}
+    compact={compactDescription}
+    {disabled}
+    onSave={onSaveDescription}
+  />
   <div class="messages" bind:this={list} onscroll={updateReadPosition}>
     {#if hasOlder}
       <button

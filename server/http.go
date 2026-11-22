@@ -49,6 +49,7 @@ func (s *Server) bootstrap(c echo.Context) error {
 
 	type channelState struct {
 		Channel
+		Description       string  `json:"description"`
 		Unread            bool    `json:"unread"`
 		LastReadMessageID *string `json:"lastReadMessageId"`
 	}
@@ -61,11 +62,41 @@ func (s *Server) bootstrap(c echo.Context) error {
 			return nil
 		}
 
-		channels = append(channels, channelState{Channel: channel, Unread: unread, LastReadMessageID: last})
+		description, err := s.store.channelDescription(r.Context(), channel.ID)
+		if err != nil {
+			s.internalError(w, err)
+			return nil
+		}
+
+		channels = append(channels, channelState{Channel: channel, Description: description, Unread: unread, LastReadMessageID: last})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"currentUser": account.User, "channels": channels, "admin": account.Admin})
 	return nil
+}
+
+func (s *Server) updateChannelDescription(c echo.Context) error {
+	var body struct {
+		Description *string `json:"description"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return err
+	}
+	if body.Description == nil || textLength(*body.Description) > 5000 {
+		fail(c.Response(), http.StatusBadRequest, "INVALID_DESCRIPTION", "Provide a description of at most 5000 characters (or an empty string to clear it).")
+		return nil
+	}
+
+	channel := c.Param("channelId")
+	description := strings.TrimSpace(*body.Description)
+	if err := s.store.setChannelDescription(c.Request().Context(), channel, description); err != nil {
+		s.internalError(c.Response(), err)
+		return nil
+	}
+
+	result := map[string]string{"channelId": channel, "description": description}
+	s.hub.message(channel, Event{Type: "channel.description.updated", Data: result})
+	return c.JSON(http.StatusOK, result)
 }
 
 func (s *Server) history(c echo.Context) error {

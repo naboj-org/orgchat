@@ -2,6 +2,7 @@ import { AuthenticationError, ApiError, channelPath, mergeMessages, request, una
 import type {
   Bootstrap,
   Channel,
+  ChannelDescription,
   Message,
   MessagePage,
   MessageResult,
@@ -56,7 +57,13 @@ export function createChat(options: ChatOptions = {}) {
   }
 
   function applyEvent(event: ServerEvent) {
-    if (event.type === "message.created") {
+    if (event.type === "channel.description.updated") {
+      channels = channels.map((channel) =>
+        channel.id === event.data.channelId
+          ? { ...channel, description: event.data.description }
+          : channel,
+      );
+    } else if (event.type === "message.created") {
       const { message, author } = event.data;
       cacheUsers([author]);
       history[message.channelId] = mergeMessages(
@@ -195,6 +202,15 @@ export function createChat(options: ChatOptions = {}) {
       cacheUsers([author]);
       history[id] = mergeMessages(history[id] ?? [], [message]);
     }
+  }
+
+  async function setChannelDescription(id: string, description: string) {
+    const session = generation;
+    const data = await request<ChannelDescription>(`${channelPath(id)}/description`, {
+      method: "PUT",
+      body: JSON.stringify({ description }),
+    });
+    if (session === generation) applyEvent({ type: "channel.description.updated", data });
   }
 
   async function markRead(id: string, messageId: string) {
@@ -422,6 +438,7 @@ export function createChat(options: ChatOptions = {}) {
     loadOlder,
     send,
     markRead,
+    setChannelDescription,
     retry: () => retryConnection(),
   };
 }
