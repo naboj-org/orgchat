@@ -61,12 +61,8 @@
       byte => byte.toString(16).padStart(2, "0")).join("");
     const url = new URL("/popout.html", location.origin);
     url.hash = handoff;
-    const tab = window.open(url.href, "_blank");
-    if (!tab) {
-      popoutError = "Your browser blocked the new tab. Allow popups for chat and try again.";
-      return;
-    }
     openingTab = true;
+    window.open(url.href, "_blank", "noopener");
     try {
       await request<void>("/auth/popout", {
         method: "POST",
