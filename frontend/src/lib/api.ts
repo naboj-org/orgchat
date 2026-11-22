@@ -1,4 +1,5 @@
 export type User = { id: string; username: string; affiliation?: string };
+export type PresenceUser = User & { channelIds: string[] };
 export type Channel = {
   id: string;
   name: string;
@@ -21,10 +22,10 @@ export type MessagePage = {
 export type MessageResult = { message: Message; author: User };
 export type ServerEvent =
   | { type: "message.created"; data: MessageResult }
-  | { type: "presence.snapshot"; data: { users: User[] } }
+  | { type: "presence.snapshot"; data: { users: PresenceUser[] } }
   | {
       type: "presence.changed";
-      data: { user: User; online: true } | { userId: string; online: false };
+      data: { user: PresenceUser; online: true } | { userId: string; online: false };
     }
   | {
       type: "channel.read";

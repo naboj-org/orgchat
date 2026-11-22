@@ -39,6 +39,22 @@ func sharesChannel(a, b Account) bool {
 	return false
 }
 
+type PresenceUser struct {
+	User
+	ChannelIDs []string `json:"channelIds"`
+}
+
+// Only expose memberships in channels the recipient can access.
+func presenceUser(account, recipient Account) PresenceUser {
+	channelIDs := make([]string, 0)
+	for _, channel := range account.Channels {
+		if recipient.canAccess(channel.ID) {
+			channelIDs = append(channelIDs, channel.ID)
+		}
+	}
+	return PresenceUser{User: account.User, ChannelIDs: channelIDs}
+}
+
 func (c *Client) stop() {
 	c.once.Do(func() {
 		close(c.done)
@@ -70,7 +86,7 @@ func (h *Hub) add(c *Client) {
 		return
 	}
 
-	users := make([]User, 0)
+	users := make([]PresenceUser, 0)
 	seen := make(map[string]bool)
 	alreadyOnline := false
 
@@ -80,13 +96,13 @@ func (h *Hub) add(c *Client) {
 		}
 		if !seen[other.account.User.ID] &&
 			(other.account.User.ID == c.account.User.ID || sharesChannel(c.account, other.account)) {
-			users = append(users, other.account.User)
+			users = append(users, presenceUser(other.account, c.account))
 			seen[other.account.User.ID] = true
 		}
 	}
 
 	if !seen[c.account.User.ID] {
-		users = append(users, c.account.User)
+		users = append(users, presenceUser(c.account, c.account))
 	}
 
 	c.enqueue(Event{Type: "presence.snapshot", Data: map[string]any{"users": users}})
@@ -96,7 +112,7 @@ func (h *Hub) add(c *Client) {
 			if sharesChannel(c.account, other.account) {
 				other.enqueue(Event{
 					Type: "presence.changed",
-					Data: map[string]any{"user": c.account.User, "online": true},
+					Data: map[string]any{"user": presenceUser(c.account, other.account), "online": true},
 				})
 			}
 		}

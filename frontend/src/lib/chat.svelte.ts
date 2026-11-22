@@ -20,6 +20,7 @@ export function createChat(options: ChatOptions = {}) {
   let userMap = $state<Record<string, User>>({});
   let channels = $state<Channel[]>([]);
   let onlineUserIds = $state<string[]>([]);
+  let onlineChannelIds = $state<Record<string, string[]>>({});
   let currentUserId = $state("");
   let history = $state<Record<string, Message[]>>({});
   let cursors = $state<Record<string, string | null>>({});
@@ -37,6 +38,7 @@ export function createChat(options: ChatOptions = {}) {
 
   const onlineUsers = $derived(
     onlineUserIds
+      .filter((id) => onlineChannelIds[id]?.some((channelId) => openChannelIds.includes(channelId)))
       .flatMap((id) => (userMap[id] ? [userMap[id]] : []))
       .sort((a, b) =>
         a.username.localeCompare(b.username, undefined, {
@@ -76,13 +78,16 @@ export function createChat(options: ChatOptions = {}) {
     } else if (event.type === "presence.snapshot") {
       cacheUsers(event.data.users);
       onlineUserIds = event.data.users.map((user) => user.id);
+      onlineChannelIds = Object.fromEntries(event.data.users.map((user) => [user.id, user.channelIds]));
     } else if (event.type === "presence.changed") {
       if (event.data.online === true) {
         cacheUsers([event.data.user]);
+        onlineChannelIds[event.data.user.id] = event.data.user.channelIds;
         onlineUserIds = [...new Set([...onlineUserIds, event.data.user.id])];
       } else {
         const { userId } = event.data;
         onlineUserIds = onlineUserIds.filter((id) => id !== userId);
+        delete onlineChannelIds[userId];
       }
     } else if (event.type === "channel.read") {
       const { channelId, lastReadMessageId } = event.data;
@@ -320,6 +325,7 @@ export function createChat(options: ChatOptions = {}) {
           currentUserId = bootstrap.currentUser.id;
           channels = bootstrap.channels;
           onlineUserIds = [];
+          onlineChannelIds = {};
           openChannelIds = openChannelIds.filter(id => channels.some(channel => channel.id === id));
           if (!openChannelIds.length && channels[0]) openChannelIds = [channels[0].id];
           // Drop stale caches on reconnect: there is no server event replay.
