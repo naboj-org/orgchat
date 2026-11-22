@@ -20,7 +20,34 @@
       { type: "orgchat:visibility", visible: available }, parentOrigin,
     );
   });
-  const chat = createChat({ beforeConnect: auth.checkCookies, authenticate: auth.authenticate });
+  const selectedChannelKey = "orgchat:widget:selected-channel";
+
+  function restoreSelectedChannel(): string[] {
+    try {
+      const id = localStorage.getItem(selectedChannelKey);
+      return id ? [id] : [];
+    } catch {
+      // Storage can be unavailable in third-party embeds.
+      return [];
+    }
+  }
+
+  const chat = createChat({
+    beforeConnect: auth.checkCookies,
+    authenticate: auth.authenticate,
+    initialOpenChannelIds: restoreSelectedChannel(),
+  });
+
+  function selectChannel(id: string) {
+    chat.setOpenChannels([id]);
+    const selected = chat.openChannelIds[0];
+    if (!selected) return;
+    try {
+      localStorage.setItem(selectedChannelKey, selected);
+    } catch {
+      // Keep channel switching usable even when storage is blocked.
+    }
+  }
   const unreadCount = $derived(chat.unreadChannels.length);
   const activeChannel = $derived(chat.openChannelIds[0] ?? "");
   const conversation = $derived(chat.conversation(activeChannel));
@@ -157,7 +184,7 @@
           id="widget-channel"
           value={activeChannel}
           disabled={!chat.connected || chat.syncing}
-          onchange={(event) => chat.setOpenChannels([event.currentTarget.value])}>
+          onchange={(event) => selectChannel(event.currentTarget.value)}>
           {#if !chat.channels.length}<option value="">Loading…</option>{/if}
           {#each chat.channels as channel (channel.id)}
             <option value={channel.id}>

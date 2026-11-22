@@ -10,6 +10,7 @@ import type {
 } from "./api";
 
 type ChatOptions = {
+  initialOpenChannelIds?: string[];
   beforeConnect?: () => Promise<boolean>;
   authenticate?: () => Promise<void>;
 };
@@ -22,7 +23,7 @@ export function createChat(options: ChatOptions = {}) {
   let currentUserId = $state("");
   let history = $state<Record<string, Message[]>>({});
   let cursors = $state<Record<string, string | null>>({});
-  let openChannelIds = $state<string[]>([]);
+  let openChannelIds = $state<string[]>(options.initialOpenChannelIds ?? []);
   let connected = $state(false);
   let syncing = $state(true);
   let loading = $state<Record<string, boolean>>({});
