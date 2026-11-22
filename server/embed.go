@@ -29,6 +29,7 @@ func (s *Server) popoutAuthEndpoint(c echo.Context) error {
 	claims := AuthClaims{
 		User:     account.User,
 		Channels: account.Channels,
+		Admin:    account.Admin,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   account.User.ID,

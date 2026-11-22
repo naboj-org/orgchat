@@ -67,6 +67,19 @@ func (s *Server) requireSession(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// Use after requireSession for administrative endpoints. Channel-scoped actions
+// should also use requireChannel; admin does not bypass channel grants.
+func (s *Server) requireAdmin(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !requestAccount(c).Admin {
+			fail(c.Response(), http.StatusForbidden, "ADMIN_REQUIRED", "Administrator access is required.")
+			return nil
+		}
+
+		return next(c)
+	}
+}
+
 func (s *Server) requireChannel(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		channel := c.Param("channelId")

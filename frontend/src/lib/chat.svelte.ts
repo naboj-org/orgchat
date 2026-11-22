@@ -22,6 +22,7 @@ export function createChat(options: ChatOptions = {}) {
   let onlineUserIds = $state<string[]>([]);
   let onlineChannelIds = $state<Record<string, string[]>>({});
   let currentUserId = $state("");
+  let admin = $state(false);
   let history = $state<Record<string, Message[]>>({});
   let cursors = $state<Record<string, string | null>>({});
   let openChannelIds = $state<string[]>(options.initialOpenChannelIds ?? []);
@@ -323,6 +324,7 @@ export function createChat(options: ChatOptions = {}) {
           userMap = {};
           cacheUsers([bootstrap.currentUser]);
           currentUserId = bootstrap.currentUser.id;
+          admin = bootstrap.admin;
           channels = bootstrap.channels;
           onlineUserIds = [];
           onlineChannelIds = {};
@@ -388,6 +390,9 @@ export function createChat(options: ChatOptions = {}) {
   return {
     get channels() {
       return channels;
+    },
+    get admin() {
+      return admin;
     },
     get openChannelIds() {
       return openChannelIds;

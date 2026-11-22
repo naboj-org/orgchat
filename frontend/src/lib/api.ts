@@ -13,7 +13,7 @@ export type Message = {
   text: string;
   createdAt: string;
 };
-export type Bootstrap = { currentUser: User; channels: Channel[] };
+export type Bootstrap = { currentUser: User; channels: Channel[]; admin: boolean };
 export type MessagePage = {
   messages: Message[];
   users: User[];

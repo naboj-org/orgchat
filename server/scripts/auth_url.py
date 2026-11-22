@@ -33,6 +33,7 @@ def main():
     parser.add_argument("--user-id", required=True)
     parser.add_argument("--username", required=True)
     parser.add_argument("--affiliation", default="")
+    parser.add_argument("--admin", action="store_true", help="grant administrator privileges")
     parser.add_argument(
         "--channel",
         action="append",
@@ -105,6 +106,7 @@ def main():
             "affiliation": args.affiliation,
         },
         "channels": channels,
+        "admin": args.admin,
     }
 
     if args.issuer:

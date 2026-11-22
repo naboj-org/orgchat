@@ -19,6 +19,7 @@ const cookieName = "orgchat_session"
 type AuthClaims struct {
 	User     User      `json:"user"`
 	Channels []Channel `json:"channels"`
+	Admin    bool      `json:"admin"`
 	jwt.RegisteredClaims
 }
 
@@ -91,7 +92,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request, raw string, redir
 		return
 	}
 	token := base64.RawURLEncoding.EncodeToString(bytes)
-	account := Account{User: claims.User, Channels: claims.Channels}
+	account := Account{User: claims.User, Channels: claims.Channels, Admin: claims.Admin}
 
 	if err := s.store.saveAccount(r.Context(), account, token); err != nil {
 		s.internalError(w, err)

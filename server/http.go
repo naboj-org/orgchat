@@ -64,7 +64,7 @@ func (s *Server) bootstrap(c echo.Context) error {
 		channels = append(channels, channelState{Channel: channel, Unread: unread, LastReadMessageID: last})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"currentUser": account.User, "channels": channels})
+	writeJSON(w, http.StatusOK, map[string]any{"currentUser": account.User, "channels": channels, "admin": account.Admin})
 	return nil
 }
 

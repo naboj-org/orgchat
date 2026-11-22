@@ -19,6 +19,7 @@ type Channel struct {
 type Account struct {
 	User     User      `json:"user"`
 	Channels []Channel `json:"channels"`
+	Admin    bool      `json:"admin"`
 }
 
 type Message struct {
